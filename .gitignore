@@ -1,8 +1,15 @@
 node_modules/
 .next/
 dist/
+test-results/
+playwright-report/
 .env
 .env.local
+.env.*
+!.env.example
 *.log
 .DS_Store
 .vercel/
+
+# scratch del skill executing-plans (ledger, briefs, review packages)
+.superpowers/

@@ -4,8 +4,10 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { errorEnvelope } from './errors.js';
 import type { Env } from './env.js';
+import { catalogRoutes } from './modules/catalog/catalog.routes.js';
+import type { CatalogDataSource } from './modules/catalog/catalog.types.js';
 
-export type AppDeps = { env: Env };
+export type AppDeps = { env: Env; catalog?: CatalogDataSource };
 
 export const API_VERSION = '0.1.0';
 
@@ -60,6 +62,10 @@ export function createApp(deps: AppDeps): Express {
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, version: API_VERSION, time: new Date().toISOString() });
   });
+
+  if (deps.catalog) {
+    app.use('/api', catalogRoutes({ catalog: deps.catalog }));
+  }
 
   const handler: ErrorRequestHandler = (err, _req, res, _next) => {
     const { status, body } = errorEnvelope(err);

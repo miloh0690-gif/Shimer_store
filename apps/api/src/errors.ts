@@ -16,6 +16,10 @@ export function badRequest(message: string, details: unknown[] = []): AppError {
   return new AppError('BAD_REQUEST', 400, message, details);
 }
 
+export function validacion(message: string, details: unknown[] = []): AppError {
+  return new AppError('VALIDATION', 400, message, details);
+}
+
 export function notFound(message = 'Recurso no encontrado'): AppError {
   return new AppError('NOT_FOUND', 404, message);
 }

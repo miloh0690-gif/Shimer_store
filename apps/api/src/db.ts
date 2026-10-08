@@ -8,6 +8,13 @@ import type {
   ProductRow,
   ProductVariantRow,
 } from './modules/catalog/catalog.types.js';
+import type {
+  CreateOrderRecord,
+  OrderItemRow,
+  OrderRow,
+  OrderWithItems,
+  OrdersDataSource,
+} from './modules/orders/orders.types.js';
 
 const SELECT_CATEGORIA = 'categories(slug,nombre)';
 const SELECT_MARCA = 'brands(slug,nombre)';
@@ -95,6 +102,12 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
       return res.data as ProductRow | null;
     },
 
+    async productsPorIds(ids: string[]): Promise<ProductRow[]> {
+      if (ids.length === 0) return [];
+      const res = await client.from('products').select(SELECT_BASE).in('id', ids);
+      return unwrap<ProductRow[]>(res.data, res.error, 'productsPorIds');
+    },
+
     async variantsFor(ids: string[]): Promise<ProductVariantRow[]> {
       if (ids.length === 0) return [];
       const res = await client
@@ -113,6 +126,129 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
     async brands(): Promise<BrandRow[]> {
       const res = await client.from('brands').select('*').order('nombre', { ascending: true });
       return unwrap<BrandRow[]>(res.data, res.error, 'brands');
+    },
+  };
+}
+function toOrderWithItems(order: OrderRow, items: OrderItemRow[]): OrderWithItems {
+  return {
+    id: order.id,
+    folio: order.folio,
+    estado: order.estado,
+    total_bob_cents: order.total_bob_cents,
+    cliente_nombre: order.cliente_nombre,
+    cliente_email: order.cliente_email,
+    cliente_telefono: order.cliente_telefono,
+    envio_tipo: order.envio_tipo,
+    envio_direccion: order.envio_direccion,
+    envio_ciudad: order.envio_ciudad,
+    created_at: order.created_at,
+    items: items.map((i) => ({
+      id: i.id,
+      nombre_snapshot: i.nombre_snapshot,
+      cantidad: i.cantidad,
+      precio_unitario_bob_cents: i.precio_unitario_bob_cents,
+      subtotal_bob_cents: i.subtotal_bob_cents,
+    })),
+  };
+}
+
+export function supabaseOrdersDataSource(client: SupabaseClient): OrdersDataSource {
+  async function itemsDe(orderId: string): Promise<OrderItemRow[]> {
+    const res = await client
+      .from('order_items')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('id', { ascending: true });
+    return unwrap<OrderItemRow[]>(res.data, res.error, 'order_items');
+  }
+
+  async function conItems(row: OrderRow): Promise<OrderWithItems> {
+    return toOrderWithItems(row, await itemsDe(row.id));
+  }
+
+  return {
+    async findByIdempotencyKey(key: string): Promise<OrderWithItems | null> {
+      const res = await client
+        .from('orders')
+        .select('*')
+        .eq('idempotency_key', key)
+        .maybeSingle();
+      if (res.error) throw new Error(`findByIdempotencyKey: ${res.error.message}`);
+      if (!res.data) return null;
+      return conItems(res.data as OrderRow);
+    },
+
+    async nextFolio(): Promise<string> {
+      const res = await client.rpc('next_folio');
+      if (res.error) throw new Error(`next_folio: ${res.error.message}`);
+      return String(res.data);
+    },
+
+    async createOrder(input: CreateOrderRecord): Promise<OrderWithItems> {
+      const insOrden = await client
+        .from('orders')
+        .insert({
+          folio: input.folio,
+          idempotency_key: input.idempotency_key,
+          cliente_nombre: input.cliente_nombre,
+          cliente_email: input.cliente_email,
+          cliente_telefono: input.cliente_telefono,
+          envio_tipo: input.envio_tipo,
+          envio_direccion: input.envio_direccion,
+          envio_ciudad: input.envio_ciudad,
+          total_bob_cents: input.total_bob_cents,
+        })
+        .select('*')
+        .single();
+      if (insOrden.error) {
+        // Se propaga el error crudo: createOrder necesita ver code === '23505'.
+        throw Object.assign(new Error(`orders: ${insOrden.error.message}`), {
+          code: insOrden.error.code,
+        });
+      }
+      const orden = insOrden.data as OrderRow;
+
+      const insItems = await client.from('order_items').insert(
+        input.items.map((linea) => ({
+          order_id: orden.id,
+          product_id: linea.product_id,
+          variant_id: linea.variant_id,
+          nombre_snapshot: linea.nombre_snapshot,
+          precio_unitario_bob_cents: linea.precio_unitario_bob_cents,
+          cantidad: linea.cantidad,
+          subtotal_bob_cents: linea.subtotal_bob_cents,
+        })),
+      );
+      if (insItems.error) {
+        // Orden sin renglones es basura: se borra antes de propagar.
+        await client.from('orders').delete().eq('id', orden.id);
+        throw new Error(`order_items: ${insItems.error.message}`);
+      }
+
+      return conItems(orden);
+    },
+
+    async listOrdersByEmail(email: string): Promise<OrderWithItems[]> {
+      const res = await client
+        .from('orders')
+        .select('*')
+        .eq('cliente_email', email)
+        .order('created_at', { ascending: false });
+      const filas = unwrap<OrderRow[]>(res.data, res.error, 'listOrdersByEmail');
+      const items = await Promise.all(filas.map((f) => itemsDe(f.id)));
+      return filas.map((f, i) => toOrderWithItems(f, items[i] ?? []));
+    },
+
+    async updateEstado(id: string, estado: string): Promise<OrderWithItems> {
+      const res = await client
+        .from('orders')
+        .update({ estado })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (res.error) throw new Error(`updateEstado: ${res.error.message}`);
+      if (!res.data) throw new Error(`updateEstado: la orden ${id} no existe`);
+      return conItems(res.data as OrderRow);
     },
   };
 }

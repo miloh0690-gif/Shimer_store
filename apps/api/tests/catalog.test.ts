@@ -97,6 +97,9 @@ function fakeCatalog(overrides: Partial<CatalogDataSource> = {}): FakeCatalog {
     async productBySlug(slug) {
       return slug === 'crayola-super-tips-150' ? fila() : null;
     },
+    async productsPorIds(ids) {
+      return ids.includes('p1') ? [fila()] : [];
+    },
     async variantsFor(ids) {
       fake.calls.variantsFor += 1;
       return ids.includes('p1') ? [variante()] : [];

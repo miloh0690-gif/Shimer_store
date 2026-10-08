@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
-import { supabaseCatalogDataSource } from '../src/db.js';
+import { supabaseCatalogDataSource, supabaseOrdersDataSource } from '../src/db.js';
 import type { ProductFilters } from '../src/modules/catalog/catalog.types.js';
 
 type Llamada = { nombre: string; args: unknown[] };
@@ -218,5 +218,206 @@ describe('supabaseCatalogDataSource.products', () => {
     await expect(supabaseCatalogDataSource(roto).products(filtros())).rejects.toThrow(
       'products: boom',
     );
+  });
+});
+// ── Pedidos ────────────────────────────────────────────────────────────────
+// Fake con respuesta por tabla: `createOrder` escribe en `orders` y luego en
+// `order_items`, y cada respuesta tiene que ser distinta.
+
+type Respuesta = { data: unknown; error: { message: string; code?: string } | null };
+
+function clientePedidos(respuestas: Record<string, Respuesta[]> = {}): {
+  client: SupabaseClient;
+  calls: Llamada[];
+} {
+  const calls: Llamada[] = [];
+  const usados: Record<string, number> = {};
+
+  function responder(tabla: string): Respuesta {
+    const lista = respuestas[tabla] ?? [];
+    const i = usados[tabla] ?? 0;
+    usados[tabla] = i + 1;
+    return lista[i] ?? { data: null, error: null };
+  }
+
+  function chain(tabla: string) {
+    const c: Record<string, unknown> = {};
+    const metodos = ['select', 'insert', 'update', 'delete', 'eq', 'order', 'in', 'single', 'maybeSingle'];
+    for (const m of metodos) {
+      c[m] = (...args: unknown[]) => {
+        calls.push({ nombre: `${tabla}.${m}`, args });
+        if (m === 'single' || m === 'maybeSingle') c.__terminal = m;
+        return c;
+      };
+    }
+    c.then = (onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown) => {
+      const r = responder(tabla);
+      const data = c.__terminal === 'maybeSingle' || c.__terminal === 'single' ? r.data : r.data ?? [];
+      return Promise.resolve({ data, error: r.error, count: Array.isArray(data) ? data.length : 0 }).then(
+        onFulfilled,
+        onRejected,
+      );
+    };
+    return c;
+  }
+
+  const client = {
+    from: (tabla: string) => {
+      calls.push({ nombre: 'from', args: [tabla] });
+      return chain(tabla);
+    },
+    rpc: (fn: string) => {
+      calls.push({ nombre: 'rpc', args: [fn] });
+      return Promise.resolve(respuestas.rpc?.[0] ?? { data: 'SHM-000001', error: null });
+    },
+  };
+
+  return { client: client as unknown as SupabaseClient, calls };
+}
+
+const ORDEN_FILA = {
+  id: 'o1',
+  folio: 'SHM-000001',
+  idempotency_key: 'k1',
+  estado: 'nuevo',
+  total_bob_cents: 109800,
+  cliente_nombre: 'Ana',
+  cliente_email: 'ana@example.com',
+  cliente_telefono: '70000000',
+  envio_tipo: 'cochabamba',
+  envio_direccion: null,
+  envio_ciudad: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+};
+
+const ITEM_FILA = {
+  id: 'oi1',
+  order_id: 'o1',
+  product_id: 'p1',
+  variant_id: null,
+  nombre_snapshot: 'Crayola Super Tips 150 Colores',
+  precio_unitario_bob_cents: 54900,
+  cantidad: 2,
+  subtotal_bob_cents: 109800,
+};
+
+const RECORD = {
+  folio: 'SHM-000001',
+  idempotency_key: 'k1',
+  cliente_nombre: 'Ana',
+  cliente_email: 'ana@example.com',
+  cliente_telefono: '70000000',
+  envio_tipo: 'cochabamba',
+  envio_direccion: null,
+  envio_ciudad: null,
+  total_bob_cents: 109800,
+  items: [
+    {
+      product_id: 'p1',
+      variant_id: null,
+      nombre_snapshot: 'Crayola Super Tips 150 Colores',
+      precio_unitario_bob_cents: 54900,
+      cantidad: 2,
+      subtotal_bob_cents: 109800,
+    },
+  ],
+};
+
+describe('supabaseCatalogDataSource.productsPorIds', () => {
+  it('no consulta cuando no hay ids', async () => {
+    const { client, calls } = clienteFalso();
+    const res = await supabaseCatalogDataSource(client).productsPorIds([]);
+    expect(res).toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('consulta products filtrando por id', async () => {
+    const { client, calls } = clienteFalso();
+    await supabaseCatalogDataSource(client).productsPorIds(['p1', 'p2']);
+    expect(calls.map((c) => c.nombre)).toEqual(['from', 'select', 'in']);
+    expect(calls[2]?.args).toEqual(['id', ['p1', 'p2']]);
+  });
+});
+
+describe('supabaseOrdersDataSource', () => {
+  it('nextFolio llama a la función next_folio de Postgres', async () => {
+    const { client, calls } = clientePedidos();
+    await expect(supabaseOrdersDataSource(client).nextFolio()).resolves.toBe('SHM-000001');
+    expect(calls[0]).toEqual({ nombre: 'rpc', args: ['next_folio'] });
+  });
+
+  it('findByIdempotencyKey devuelve null si no hay orden', async () => {
+    const { client } = clientePedidos({ orders: [{ data: null, error: null }] });
+    await expect(
+      supabaseOrdersDataSource(client).findByIdempotencyKey('k1'),
+    ).resolves.toBeNull();
+  });
+
+  it('findByIdempotencyKey arma la orden con sus renglones', async () => {
+    const { client } = clientePedidos({
+      orders: [{ data: ORDEN_FILA, error: null }],
+      order_items: [{ data: [ITEM_FILA], error: null }],
+    });
+    const orden = await supabaseOrdersDataSource(client).findByIdempotencyKey('k1');
+    expect(orden?.folio).toBe('SHM-000001');
+    expect(orden?.items).toHaveLength(1);
+    expect(orden?.items[0]?.subtotal_bob_cents).toBe(109800);
+  });
+
+  it('createOrder inserta la orden y sus renglones y devuelve el total', async () => {
+    const { client, calls } = clientePedidos({
+      orders: [{ data: ORDEN_FILA, error: null }],
+      order_items: [{ data: null, error: null }],
+    });
+    const orden = await supabaseOrdersDataSource(client).createOrder(RECORD);
+    expect(orden.total_bob_cents).toBe(109800);
+    const inserciones = calls.filter((c) => c.nombre.endsWith('.insert'));
+    expect(inserciones.map((c) => c.nombre)).toEqual(['orders.insert', 'order_items.insert']);
+  });
+
+  it('createOrder borra la orden si falla el insert de los renglones', async () => {
+    const { client, calls } = clientePedidos({
+      orders: [{ data: ORDEN_FILA, error: null }],
+      order_items: [{ data: null, error: { message: 'boom' } }],
+    });
+    await expect(supabaseOrdersDataSource(client).createOrder(RECORD)).rejects.toThrow(
+      'order_items: boom',
+    );
+    expect(calls.some((c) => c.nombre === 'orders.delete')).toBe(true);
+  });
+
+  it('createOrder propaga el code 23505 para que el servicio detecte la carrera', async () => {
+    const { client } = clientePedidos({
+      orders: [{ data: null, error: { message: 'duplicate key', code: '23505' } }],
+    });
+    await expect(supabaseOrdersDataSource(client).createOrder(RECORD)).rejects.toMatchObject({
+      code: '23505',
+    });
+  });
+
+  it('listOrdersByEmail devuelve las órdenes de ese correo', async () => {
+    const { client, calls } = clientePedidos({
+      orders: [{ data: [ORDEN_FILA], error: null }],
+      order_items: [{ data: [ITEM_FILA], error: null }],
+    });
+    const ordenes = await supabaseOrdersDataSource(client).listOrdersByEmail('ana@example.com');
+    expect(ordenes).toHaveLength(1);
+    expect(calls.some((c) => c.args[0] === 'cliente_email')).toBe(true);
+  });
+
+  it('updateEstado cambia el estado y falla si la orden no existe', async () => {
+    // Postgres devuelve la fila ya actualizada, no la anterior.
+    const { client } = clientePedidos({
+      orders: [{ data: { ...ORDEN_FILA, estado: 'enviado' }, error: null }],
+      order_items: [{ data: [], error: null }],
+    });
+    await expect(supabaseOrdersDataSource(client).updateEstado('o1', 'enviado')).resolves.toMatchObject({
+      estado: 'enviado',
+    });
+
+    const vacio = clientePedidos({ orders: [{ data: null, error: null }] });
+    await expect(
+      supabaseOrdersDataSource(vacio.client).updateEstado('o9', 'enviado'),
+    ).rejects.toThrow('no existe');
   });
 });

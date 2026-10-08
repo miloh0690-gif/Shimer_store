@@ -81,12 +81,14 @@ export default function CompraProducto({ producto }: Props) {
       ) : null}
 
       <AddToCartButton
-        productId={producto.id}
+        product={{
+          id: producto.id,
+          nombre: producto.nombre,
+          precio_bob_cents: producto.precio_efectivo_bob_cents,
+          stock,
+        }}
         variantId={variantId}
-        nombre={producto.nombre}
-        precioBobCents={producto.precio_efectivo_bob_cents}
         imagen={producto.imagenes[0] ?? null}
-        stock={stock}
       />
 
       <p className="text-xs text-tinta/50">

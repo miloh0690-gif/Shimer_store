@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { Fredoka, Plus_Jakarta_Sans } from 'next/font/google'
+import { CartDrawer } from '@/components/carrito/CartDrawer'
+import { CartProvider } from '@/components/carrito/CartProvider'
 import { Footer } from '@/components/layout/Footer'
 import { Header } from '@/components/layout/Header'
 import { MotionRoot } from '@/components/motion/MotionRoot'
@@ -30,9 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es-BO" className={`${fredoka.variable} ${jakarta.variable}`}>
       <body>
         <MotionRoot>
-          <Header />
-          {children}
-          <Footer />
+          <CartProvider>
+            <Header />
+            {children}
+            <Footer />
+            <CartDrawer />
+          </CartProvider>
         </MotionRoot>
       </body>
     </html>

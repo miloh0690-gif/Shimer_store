@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { CarritoBoton } from '@/components/carrito/CarritoBoton'
 
 const ENLACES = [
   { href: '/productos', texto: 'Productos' },
@@ -48,17 +49,7 @@ export function Header() {
               <path d="M20 20l-3.5-3.5" strokeLinecap="round" />
             </svg>
           </Link>
-          <Link
-            href="/carrito"
-            aria-label="Ver carrito"
-            className="rounded-full p-2 text-tinta/70 transition-colors hover:bg-white hover:text-marca-violeta"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M3 4h2l2.4 11h10L20 7H6" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="10" cy="19" r="1.4" />
-              <circle cx="17" cy="19" r="1.4" />
-            </svg>
-          </Link>
+          <CarritoBoton />
         </div>
       </div>
 

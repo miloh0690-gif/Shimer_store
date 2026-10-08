@@ -12,6 +12,9 @@ type ValorCarrito = {
   abierto: boolean
   setAbierto: (abierto: boolean) => void
   subtotal: number
+  /** True cuando ya se leyo el localStorage: sirve para no mostrar un
+   *  "carrito vacio" en el primer render antes de hidratar. */
+  listo: boolean
 }
 
 const Contexto = createContext<ValorCarrito | null>(null)
@@ -23,11 +26,13 @@ const Contexto = createContext<ValorCarrito | null>(null)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { lines: [] })
   const [abierto, setAbierto] = useState(false)
+  const [listo, setListo] = useState(false)
   const hidratado = useRef(false)
 
   useEffect(() => {
     dispatch({ type: 'hidratar', state: leerCarrito(window.localStorage) })
     hidratado.current = true
+    setListo(true)
   }, [])
 
   useEffect(() => {
@@ -43,8 +48,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       abierto,
       setAbierto,
       subtotal: cartSubtotalEstimado(state),
+      listo,
     }),
-    [state, abierto],
+    [state, abierto, listo],
   )
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>

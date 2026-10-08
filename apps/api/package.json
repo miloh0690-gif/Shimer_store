@@ -27,6 +27,6 @@
     "@types/supertest": "^6",
     "supertest": "^7",
     "typescript": "^5",
-    "vitest": "^2"
+    "vitest": "^5"
   }
 }

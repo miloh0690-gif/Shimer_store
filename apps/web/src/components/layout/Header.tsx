@@ -17,7 +17,8 @@ export function Header() {
         <Link href="/" className="flex items-center gap-3">
           <Image
             src="/logo.jpg"
-            alt="SHIMER"
+            // El enlace ya dice SHIMER: repetirlo en el alt es redundante.
+            alt=""
             width={44}
             height={44}
             className="rounded-xl shadow-sm"

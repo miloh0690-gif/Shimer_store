@@ -1,19 +1,20 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import gsap from 'gsap'
+import { useMotionListo } from '@/components/motion/motion-engine'
 
 /**
- * Fondo del hero con parallax: el contenido se mueve más lento que el scroll.
- * Solo anima `y`, y con `prefers-reduced-motion` no se mueve nada.
+ * Fondo del hero con parallax: el contenido se mueve mas lento que el scroll.
+ * Solo anima `y`. Como el motor se descarga diferido, si todavia no esta
+ * disponible el fondo queda en su sitio (que ya se ve bien) y no se anima.
  */
 export function HeroParallax() {
   const ref = useRef<HTMLDivElement>(null);
+  const { gsap } = useMotionListo();
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!el || !gsap) return;
 
     const ctx = gsap.context(() => {
       gsap.to(el, {
@@ -29,7 +30,7 @@ export function HeroParallax() {
     }, el);
 
     return () => ctx.revert();
-  }, []);
+  }, [gsap]);
 
   return (
     <div

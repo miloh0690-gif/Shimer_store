@@ -1,36 +1,28 @@
 'use client'
 
 import { useEffect } from 'react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import Lenis from 'lenis'
+import { arrancarMotion, motionActual } from './motion-engine'
+
+type ConIdle = (cb: () => void) => number
 
 /**
- * Raíz de la animación del sitio: scroll suave con Lenis sincronizado con
- * ScrollTrigger. Se monta una sola vez desde layout.tsx y se destruye al
- * desmontar, así que navegar entre páginas no acumula listeners.
+ * Raiz de la animacion del sitio: pide el motor diferido (gsap + ScrollTrigger
+ * + lenis) cuando el navegador queda libre, para que ninguno de los tres
+ * entre en el bundle del primer render. Mientras se descarga, el sitio usa el
+ * scroll nativo y todo el contenido se ve con normalidad.
+ *
+ * Si el usuario pidio menos movimiento, `arrancarMotion` no descarga nada y
+ * este componente no hace nada.
  */
 export function MotionRoot({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-
-    gsap.registerPlugin(ScrollTrigger);
-    const lenis = new Lenis({ lerp: 0.1 });
-
-    lenis.on('scroll', ScrollTrigger.update);
-    let frame = 0;
-    const loop = (time: number) => {
-      lenis.raf(time * 1000);
-      frame = requestAnimationFrame(loop);
-    };
-    frame = requestAnimationFrame(loop);
+    const pedir = (globalThis as unknown as { requestIdleCallback?: ConIdle })
+      .requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
+    const id = pedir(() => arrancarMotion());
 
     return () => {
-      cancelAnimationFrame(frame);
-      lenis.destroy();
-      ScrollTrigger.getAll().forEach((t) => t.kill());
+      if (typeof id === 'number') window.clearTimeout(id);
+      motionActual().destruir?.();
     };
   }, []);
 

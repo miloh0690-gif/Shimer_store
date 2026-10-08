@@ -50,6 +50,9 @@ export function Hero() {
           alt="SHIMER"
           width={96}
           height={96}
+          // El logo del hero es el elemento LCP: sin priority llega tarde y
+          // el Lighthouse movil lo marca como lcp-lazy-loaded.
+          priority
           className="mx-auto rounded-2xl shadow-xl ring-4 ring-white/60"
         />
         <ShippingBanners />

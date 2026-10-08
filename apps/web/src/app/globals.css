@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/*
+ * El prefijo `marca-` evita chocar con la escala `violet-50…950` que Tailwind
+ * ya trae: `bg-marca-violeta` es nuestro violeta de marca, `bg-violet-500` el de
+ * Tailwind. Las clases resultantes son bg-crema, text-tinta, bg-marca-violeta…
+ */
+@theme {
+  --color-marca-violeta: #7c3aed;
+  --color-marca-magenta: #e935c1;
+  --color-marca-rosa: #ff6b9d;
+  --color-crema: #fdf9f3;
+  --color-tinta: #17111f;
+  --color-menta: #00b2ac;
+  --font-display: var(--font-fredoka), system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+}
+
+:root {
+  /* El degradado de marca solo se usa en logo, precios y hero. */
+  --gradiente-marca: linear-gradient(135deg, #7c3aed, #e935c1, #ff6b9d);
+}
+
+body {
+  background: var(--color-crema);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Imagen de producto no disponible">
+  <rect width="800" height="800" fill="#FDF9F3"/>
+  <g transform="translate(400 360) rotate(-12)">
+    <rect x="-38" y="-120" width="76" height="240" rx="14" fill="#7C3AED"/>
+    <rect x="-38" y="72" width="76" height="48" rx="10" fill="#E935C1"/>
+    <path d="M-38 -120 L0 -160 L38 -120 Z" fill="#FF6B9D"/>
+    <path d="M-38 120 L0 152 L38 120 Z" fill="#17111F"/>
+  </g>
+  <text x="400" y="620" text-anchor="middle" font-family="system-ui, sans-serif" font-size="92" font-weight="700" fill="#7C3AED" letter-spacing="6">SHIMER</text>
+  <text x="400" y="676" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" fill="#17111F" opacity="0.55">Imagen no disponible</text>
+</svg>

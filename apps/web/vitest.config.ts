@@ -15,7 +15,11 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // jsdom solo expone localStorage cuando el documento tiene una URL http;
+    // con about:blank viene undefined.
+    environmentOptions: { jsdom: { url: 'http://localhost:3000' } },
     globals: true,
+    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },
 })

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ImagenProducto } from '@/components/product/ImagenProducto'
+import { ImagenProducto } from '@/components/producto/ImagenProducto'
 import { formatBob } from '@/lib/format'
 import type { ProductView } from '@/lib/types'
 

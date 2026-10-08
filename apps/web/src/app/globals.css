@@ -35,6 +35,52 @@ h3,
   font-family: var(--font-display);
 }
 
+/*
+ * Transiciones de entrada de pagina y del cajon del carrito, en CSS.
+ *
+ * Antes estas dos animaciones usaban `motion` (framer-motion, 123 kB) y por eso
+ * ese paquete entraba en el bundle de la PRIMERA carga de todas las rutas.
+ * Como un fade y un deslizar se expresan con dos keyframes, el JS se va y la
+ * animacion se queda: mismo efecto, 123 kB menos.
+ *
+ * El truco de `visibility 0s linear 300ms` es lo que hace que el cierre tambien
+ * se anime: visibility es discreto, asi que sin el delay el panel se
+ * esconderia de golpe en vez de deslizarse fuera.
+ */
+@keyframes entrada-pagina {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.entrada-pagina {
+  animation: entrada-pagina 0.35s ease-out both;
+}
+
+/*
+ * El estado visible/oculto del cajon va en estilo inline en el componente
+ * (asi es testeable en jsdom, que no carga el CSS del proyecto); aqui solo la
+ * transicion. El `transition-delay` en inline es lo que hace que el cierre
+ * tambien se anime: visibility es discreto, asi que sin delay el panel se
+ * esconderia de golpe en vez de deslizarse fuera.
+ */
+.cajon-panel {
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+
+.cajon-velo {
+  transition:
+    opacity 300ms,
+    visibility 0s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -42,6 +88,9 @@ h3,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Sin esto el panel del carrito tardaria 300 ms en esconderse todavia con
+       el movimiento reducido, porque el delay de `visibility` no es duracion. */
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }

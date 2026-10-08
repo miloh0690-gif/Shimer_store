@@ -1,6 +1,7 @@
 import { SignJWT } from 'jose'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { verifyToken } from '../src/auth.js'
+import type { AuthUser } from '../src/auth.js'
 
 const SECRET = 'secreto-de-prueba-largo'
 const OTRO = 'otro-secreto-de-prueba'
@@ -57,3 +58,36 @@ describe('verifyToken', () => {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const algNinguno = null
+
+describe('verifyToken con respaldo de Supabase', () => {
+  it('acepta un token que Supabase valida aunque HS256 falle', async () => {
+    const remoto: AuthUser = { id: 'u-es256', email: 'admin@shimer.test' };
+    const respaldo = vi.fn(async () => remoto);
+    const token = await firmar({ sub: 'u1', email: 'otro@example.com' }, OTRO);
+    await expect(verifyToken(token, SECRET, respaldo)).resolves.toEqual(remoto);
+    expect(respaldo).toHaveBeenCalledWith(token);
+  });
+
+  it('no consulta Supabase si el token ya valido con HS256', async () => {
+    const respaldo = vi.fn(async () => null);
+    const token = await firmar({ sub: 'u1', email: 'ana@example.com' });
+    await expect(verifyToken(token, SECRET, respaldo)).resolves.toEqual({
+      id: 'u1',
+      email: 'ana@example.com',
+    });
+    expect(respaldo).not.toHaveBeenCalled();
+  });
+
+  it('devuelve null si ni HS256 ni Supabase aceptan el token', async () => {
+    const respaldo = vi.fn(async () => null);
+    await expect(verifyToken('no-es-un-jwt', SECRET, respaldo)).resolves.toBeNull();
+    expect(respaldo).toHaveBeenCalled();
+  });
+
+  it('devuelve null si el respaldo lanza', async () => {
+    const respaldo = vi.fn(async () => {
+      throw new Error('red caída');
+    });
+    await expect(verifyToken('no-es-un-jwt', SECRET, respaldo)).resolves.toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { notFound, validacion } from '../../errors.js'
-import type { AuthUser, ProfilesDataSource } from '../../auth.js'
+import type { AuthUser, ProfilesDataSource, RespaldoToken } from '../../auth.js'
 import { requireAdmin, requireAuth } from '../../auth.js'
 import type { Env } from '../../env.js'
 import type { CatalogDataSource } from '../catalog/catalog.types.js'
@@ -12,6 +12,7 @@ export type AdminRoutesDeps = {
   catalog: CatalogDataSource;
   orders: OrdersDataSource;
   profiles: ProfilesDataSource;
+  respaldo?: RespaldoToken;
 };
 
 /**
@@ -20,7 +21,7 @@ export type AdminRoutesDeps = {
  */
 export function adminRoutes(deps: AdminRoutesDeps): Router {
   const router = Router();
-  const sesion = requireAuth(deps.env.SUPABASE_JWT_SECRET);
+  const sesion = requireAuth(deps.env.SUPABASE_JWT_SECRET, deps.respaldo);
   const admin = requireAdmin(deps.profiles, deps.env.ADMIN_EMAILS);
 
   router.get('/orders', sesion, admin, async (_req, res) => {
@@ -59,9 +60,13 @@ export function adminRoutes(deps: AdminRoutesDeps): Router {
 }
 
 /** `GET /api/orders/mine`: solo las órdenes del email del token. */
-export function ordersMineRoutes(deps: { env: Env; orders: OrdersDataSource }): Router {
+export function ordersMineRoutes(deps: {
+  env: Env;
+  orders: OrdersDataSource;
+  respaldo?: RespaldoToken;
+}): Router {
   const router = Router();
-  router.get('/orders/mine', requireAuth(deps.env.SUPABASE_JWT_SECRET), async (_req, res) => {
+  router.get('/orders/mine', requireAuth(deps.env.SUPABASE_JWT_SECRET, deps.respaldo), async (_req, res) => {
     const user = res.locals.user as AuthUser;
     const items = await deps.orders.listOrdersByEmail(user.email);
     res.json({ items, total: items.length });

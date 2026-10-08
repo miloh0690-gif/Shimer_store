@@ -21,16 +21,36 @@ export type ProfilesDataSource = {
 };
 
 /**
- * Verifica un JWT de Supabase (HS256). El `secret` llega siempre por parámetro:
- * este módulo no lee `process.env`, para que los tests puedan firmarlo de verdad.
+ * Verificación delegada: por ejemplo `supabase.auth.getUser`, que valida las
+ * firmas reales del proyecto sin necesitar el JWT secret local.
  */
-export async function verifyToken(token: string, secret: string): Promise<AuthUser | null> {
+export type RespaldoToken = (token: string) => Promise<AuthUser | null>;
+
+/**
+ * Verifica un JWT de Supabase. Primero con HS256 y el `secret` local —que
+ * llega siempre por parámetro para que los tests puedan firmarlo de verdad— y
+ * si eso falla, con el respaldo: hoy Supabase firma los access tokens con
+ * ES256 y no con el secret, así que sin el respaldo el admin nunca entra.
+ */
+export async function verifyToken(
+  token: string,
+  secret: string,
+  respaldo?: RespaldoToken,
+): Promise<AuthUser | null> {
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
       algorithms: ['HS256'],
     });
-    if (typeof payload.sub !== 'string' || typeof payload.email !== 'string') return null;
-    return { id: payload.sub, email: payload.email };
+    if (typeof payload.sub === 'string' && typeof payload.email === 'string') {
+      return { id: payload.sub, email: payload.email };
+    }
+    return null;
+  } catch {
+    // HS256 no aplica: puede ser ES256 de Supabase o un token inválido.
+  }
+  if (!respaldo) return null;
+  try {
+    return await respaldo(token);
   } catch {
     return null;
   }
@@ -40,14 +60,14 @@ export async function verifyToken(token: string, secret: string): Promise<AuthUs
  * Exige `Authorization: Bearer <jwt>`. Sin token o con token inválido responde 401;
  * si no, deja el usuario en `res.locals.user` para los middlewares siguientes.
  */
-export function requireAuth(secret: string): RequestHandler {
+export function requireAuth(secret: string, respaldo?: RespaldoToken): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {
     const header = req.header('authorization');
     if (!header || !header.startsWith('Bearer ')) {
       next(unauthorized());
       return;
     }
-    const user = await verifyToken(header.slice('Bearer '.length), secret);
+    const user = await verifyToken(header.slice('Bearer '.length), secret, respaldo);
     if (!user) {
       next(unauthorized());
       return;

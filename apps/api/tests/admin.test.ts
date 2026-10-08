@@ -1,10 +1,10 @@
 import { SignJWT } from 'jose'
 import request from 'supertest'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../src/app.js'
 import { loadEnv } from '../src/env.js'
 import type { CatalogDataSource } from '../src/modules/catalog/catalog.types.js'
-import type { ProfilesDataSource } from '../src/auth.js'
+import type { ProfilesDataSource, RespaldoToken } from '../src/auth.js'
 import type {
   OrderWithItems,
   OrdersDataSource,
@@ -99,12 +99,15 @@ const CATALOGO: CatalogDataSource = {
 
 type Parches = { precio_bob_cents?: number; stock?: number; activo?: boolean }
 
-function appCon(o: { profiles?: ProfilesDataSource; orders?: OrdersDataSource } = {}) {
+function appCon(
+  o: { profiles?: ProfilesDataSource; orders?: OrdersDataSource; respaldo?: RespaldoToken } = {},
+) {
   return createApp({
     env,
     catalog: CATALOGO,
     orders: o.orders ?? fakeOrders(),
     profiles: o.profiles ?? fakeProfiles(),
+    respaldo: o.respaldo,
   })
 }
 
@@ -291,5 +294,35 @@ describe('GET /api/orders/mine', () => {
     expect(res.body.items.every((i: { cliente_email: string }) => i.cliente_email === EMAIL_CLIENTE)).toBe(
       true,
     )
+  })
+})
+
+describe('respaldo de Supabase para tokens ES256', () => {
+  // Supabase firma sus access tokens con ES256: HS256 con el secret local falla
+  // siempre, asi que sin el respaldo el admin nunca puede entrar.
+  it('GET /api/orders acepta el token que valida Supabase', async () => {
+    const respaldo = vi.fn(async () => ({ id: 'u-admin', email: EMAIL_ADMIN }))
+    const res = await request(appCon({ respaldo }))
+      .get('/api/orders')
+      .set('authorization', 'Bearer token-es256-de-supabase')
+    expect(respaldo).toHaveBeenCalledWith('token-es256-de-supabase')
+    expect(res.status).toBe(200)
+    expect(res.body.total).toBe(1)
+  })
+
+  it('GET /api/orders/mine acepta el token que valida Supabase', async () => {
+    const respaldo: RespaldoToken = async () => ({ id: 'u1', email: EMAIL_CLIENTE })
+    const res = await request(appCon({ respaldo }))
+      .get('/api/orders/mine')
+      .set('authorization', 'Bearer token-es256-de-supabase')
+    expect(res.status).toBe(200)
+    expect(res.body.items[0].cliente_email).toBe(EMAIL_CLIENTE)
+  })
+
+  it('sin respaldo, un token que Supabase si aceptaria responde 401', async () => {
+    const res = await request(appCon())
+      .get('/api/orders')
+      .set('authorization', 'Bearer token-es256-de-supabase')
+    expect(res.status).toBe(401)
   })
 })

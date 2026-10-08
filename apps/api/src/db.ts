@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RespaldoToken } from './auth.js';
 import type {
   BrandRow,
   CatalogDataSource,
@@ -305,5 +306,19 @@ export function supabaseProfilesDataSource(client: SupabaseClient): ProfilesData
       const ins = await client.from('profiles').insert({ id, email, nombre, rol: 'admin' });
       if (ins.error) throw new Error(`ensureAdmin: ${ins.error.message}`);
     },
+  };
+}
+
+/**
+ * Respaldo de verificación de tokens. Supabase firma sus access tokens con
+ * ES256 y claves propias, así que `jwtVerify` con el secret local no los
+ * reconoce: `auth.getUser` los valida contra el propio Supabase sin importar
+ * el algoritmo. Devuelve null si Supabase rechaza el token o si no trae email.
+ */
+export function supabaseRespaldoToken(client: SupabaseClient): RespaldoToken {
+  return async (token: string) => {
+    const { data, error } = await client.auth.getUser(token);
+    if (error || !data.user?.email) return null;
+    return { id: data.user.id, email: data.user.email };
   };
 }

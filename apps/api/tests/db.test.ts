@@ -29,6 +29,7 @@ function clienteFalso() {
     'order',
     'range',
     'in',
+    'or',
     'maybeSingle',
     'single',
   ];
@@ -74,7 +75,7 @@ describe('supabaseCatalogDataSource.products', () => {
 
   it('exige inner join en categoría cuando se filtra por su slug', async () => {
     const { client, selects } = clienteFalso();
-    await supabaseCatalogDataSource(client).products(filtros({ categoria_slug: 'arte-diseno' }));
+    await supabaseCatalogDataSource(client).products(filtros({ categoria_slugs: ['arte-diseno'] }));
     expect(selects[0]).toContain('categories!inner(slug,nombre)');
     expect(selects[0]).toContain('brands(slug,nombre)');
     expect(selects[0]).not.toContain('brands!inner');
@@ -82,7 +83,7 @@ describe('supabaseCatalogDataSource.products', () => {
 
   it('exige inner join en marca cuando se filtra por su slug', async () => {
     const { client, selects } = clienteFalso();
-    await supabaseCatalogDataSource(client).products(filtros({ marca_slug: 'crayola' }));
+    await supabaseCatalogDataSource(client).products(filtros({ marca_slugs: ['crayola'] }));
     expect(selects[0]).toContain('brands!inner(slug,nombre)');
     expect(selects[0]).toContain('categories(slug,nombre)');
   });
@@ -97,7 +98,7 @@ describe('supabaseCatalogDataSource.products', () => {
   it('el conteo también exige inner join en las relaciones que se filtran', async () => {
     const { client, selects } = clienteFalso();
     const src = supabaseCatalogDataSource(client);
-    const f = filtros({ categoria_slug: 'arte-diseno', marca_slug: 'crayola' });
+    const f = filtros({ categoria_slugs: ['arte-diseno'], marca_slugs: ['crayola'] });
     await src.countProducts(f);
     await src.products(f);
     for (const select of selects) {
@@ -116,27 +117,27 @@ describe('supabaseCatalogDataSource.products', () => {
   it('incluye los embeds también en el conteo cuando filtra por categoría', async () => {
     const { client, selects, calls } = clienteFalso();
     await supabaseCatalogDataSource(client).countProducts(
-      filtros({ categoria_slug: 'arte-diseno' }),
+      filtros({ categoria_slugs: ['arte-diseno'] }),
     );
     expect(selects[0]).toContain('categories');
     expect(selects[0]).toContain('brands');
-    expect(calls).toContainEqual({ nombre: 'eq', args: ['categories.slug', 'arte-diseno'] });
+    expect(calls).toContainEqual({ nombre: 'in', args: ['categories.slug', ['arte-diseno']] });
   });
 
   it('incluye los embeds en el conteo cuando filtra por marca', async () => {
     const { client, selects, calls } = clienteFalso();
-    await supabaseCatalogDataSource(client).countProducts(filtros({ marca_slug: 'crayola' }));
+    await supabaseCatalogDataSource(client).countProducts(filtros({ marca_slugs: ['crayola'] }));
     expect(selects[0]).toContain('categories');
     expect(selects[0]).toContain('brands');
-    expect(calls).toContainEqual({ nombre: 'eq', args: ['brands.slug', 'crayola'] });
+    expect(calls).toContainEqual({ nombre: 'in', args: ['brands.slug', ['crayola']] });
   });
 
   it('filtra por el slug de la categoría embebida', async () => {
     const { client, calls } = clienteFalso();
     await supabaseCatalogDataSource(client).countProducts(
-      filtros({ categoria_slug: 'arte-diseno' }),
+      filtros({ categoria_slugs: ['arte-diseno'] }),
     );
-    expect(calls).toContainEqual({ nombre: 'eq', args: ['categories.slug', 'arte-diseno'] });
+    expect(calls).toContainEqual({ nombre: 'in', args: ['categories.slug', ['arte-diseno']] });
   });
 
   it('traduce precio_min y precio_max a cents en la columna de precio', async () => {
@@ -144,8 +145,10 @@ describe('supabaseCatalogDataSource.products', () => {
     await supabaseCatalogDataSource(client).products(
       filtros({ precio_min_cents: 10000, precio_max_cents: 100000 }),
     );
-    expect(calls).toContainEqual({ nombre: 'gte', args: ['precio_bob_cents', 10000] });
-    expect(calls).toContainEqual({ nombre: 'lte', args: ['precio_bob_cents', 100000] });
+    // El filtro de precio va por la columna generada, que ya vale el precio
+    // de oferta cuando hay oferta, y no por el precio de lista.
+    expect(calls).toContainEqual({ nombre: 'gte', args: ['precio_efectivo_cents', 10000] });
+    expect(calls).toContainEqual({ nombre: 'lte', args: ['precio_efectivo_cents', 100000] });
   });
 
   it('en_oferta true busca las filas con precio de oferta no nulo', async () => {
@@ -173,8 +176,10 @@ describe('supabaseCatalogDataSource.products', () => {
         ['created_at', false],
       ]],
       ['recientes', [['created_at', false]]],
-      ['precio_asc', [['precio_bob_cents', true]]],
-      ['precio_desc', [['precio_bob_cents', false]]],
+      // Ordenar por precio usa la columna efectiva: si no, un producto en
+      // oferta de Bs. 48 aparece despues de uno de Bs. 49.
+      ['precio_asc', [['precio_efectivo_cents', true]]],
+      ['precio_desc', [['precio_efectivo_cents', false]]],
       ['nombre', [['nombre', true]]],
     ];
     for (const [orden, esperado] of casos) {
@@ -341,8 +346,10 @@ describe('supabaseCatalogDataSource.productsPorIds', () => {
   it('consulta products filtrando por id', async () => {
     const { client, calls } = clienteFalso();
     await supabaseCatalogDataSource(client).productsPorIds(['p1', 'p2']);
-    expect(calls.map((c) => c.nombre)).toEqual(['from', 'select', 'in']);
+    // Tambien exige activo=true: un producto desactivado no se puede pedir.
+    expect(calls.map((c) => c.nombre)).toEqual(['from', 'select', 'in', 'eq']);
     expect(calls[2]?.args).toEqual(['id', ['p1', 'p2']]);
+    expect(calls[3]?.args).toEqual(['activo', true]);
   });
 });
 

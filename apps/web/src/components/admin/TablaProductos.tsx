@@ -8,7 +8,8 @@ const POR_PAGINA = 60
 /**
  * Server component: lee el catalogo por la API y delega la edicion en
  * `EditarProducto`, que es client. El token llega por prop y se pasa hacia
- * abajo; nunca queda incrustado en el bundle del navegador.
+ * abajo: viaja en el payload RSC del HTML, no en el bundle descargable, y solo
+ * se pide en las tres rutas de /admin.
  *
  * La API filtra siempre por `activo = true`, asi que esta tabla muestra solo el
  * catalogo activo y por eso no edita ese campo.
@@ -74,6 +75,8 @@ export async function TablaProductos({ token }: { token: string }) {
                   productoId={producto.id}
                   stockInicial={producto.stock}
                   destacadoInicial={producto.destacado}
+                  precioInicial={producto.precio_bob_cents}
+                  precioOfertaInicial={producto.precio_oferta_bob_cents}
                   token={token}
                 />
               </td>

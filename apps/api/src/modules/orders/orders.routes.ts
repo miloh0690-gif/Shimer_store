@@ -7,13 +7,16 @@ import type { CatalogDataSource } from '../catalog/catalog.types.js'
 import { createOrder } from './orders.service.js'
 import type { OrdersDataSource } from './orders.types.js'
 
+// El correo se guarda en minúsculas porque Supabase entrega el suyo siempre en
+// minúsculas: si el cliente escribe "Juan@Gmail.com" y después entra con
+// "juan@gmail.com" no encontraría sus pedidos.
 const bodySchema = z.object({
-  cliente_nombre: z.string().min(1, 'El nombre es obligatorio'),
-  cliente_email: z.string().email('Correo inválido'),
-  cliente_telefono: z.string().min(1, 'El teléfono es obligatorio'),
+  cliente_nombre: z.string().trim().min(1, 'El nombre es obligatorio'),
+  cliente_email: z.string().trim().toLowerCase().email('Correo inválido'),
+  cliente_telefono: z.string().trim().min(1, 'El teléfono es obligatorio'),
   envio_tipo: z.enum(['cochabamba', 'nacional']),
-  envio_direccion: z.string().min(1).optional(),
-  envio_ciudad: z.string().min(1).optional(),
+  envio_direccion: z.string().trim().min(1).optional(),
+  envio_ciudad: z.string().trim().min(1).optional(),
   items: z
     .array(
       z.object({

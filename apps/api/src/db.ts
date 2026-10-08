@@ -24,15 +24,24 @@ const SELECT_MARCA = 'brands(slug,nombre)';
 const SELECT_BASE = `*, ${SELECT_CATEGORIA}, ${SELECT_MARCA}`;
 
 /**
+ * Los filtros de precio y el orden por precio usan `precio_efectivo_cents`, una
+ * columna generada que ya vale el precio de oferta cuando hay oferta. Ordenar
+ * por el precio de lista ponía "Bs. 48" después de "Bs. 49" mientras la ficha
+ * mostraba el precio efectivo, así que el orden no coincidía con lo que se ve.
+ */
+const COLUMNA_PRECIO = 'precio_efectivo_cents';
+
+/**
  * PostgREST solo restringe por una columna embebida si ese embed es un inner join:
  * con el embed normal el `.eq()` no filtra nada y la tienda mostraría productos de
  * todas las categorías. Por eso el `!inner` se aplica solo cuando se filtra por esa
  * relación, para no descartar productos que no tienen categoría o marca.
  */
 function selectPara(f: ProductFilters): string {
-  const categorias = f.categoria_slug === undefined ? SELECT_CATEGORIA : 'categories!inner(slug,nombre)';
-  const marcas = f.marca_slug === undefined ? SELECT_MARCA : 'brands!inner(slug,nombre)';
-  if (f.categoria_slug === undefined && f.marca_slug === undefined) return SELECT_BASE;
+  const categorias =
+    f.categoria_slugs === undefined ? SELECT_CATEGORIA : 'categories!inner(slug,nombre)';
+  const marcas = f.marca_slugs === undefined ? SELECT_MARCA : 'brands!inner(slug,nombre)';
+  if (f.categoria_slugs === undefined && f.marca_slugs === undefined) return SELECT_BASE;
   return `*, ${categorias}, ${marcas}`;
 }
 
@@ -41,8 +50,8 @@ const COUNT_SELECT = 'id, categories(slug), brands(slug)';
 
 function countSelectPara(f: ProductFilters): string {
   const categorias =
-    f.categoria_slug === undefined ? 'categories(slug)' : 'categories!inner(slug)';
-  const marcas = f.marca_slug === undefined ? 'brands(slug)' : 'brands!inner(slug)';
+    f.categoria_slugs === undefined ? 'categories(slug)' : 'categories!inner(slug)';
+  const marcas = f.marca_slugs === undefined ? 'brands(slug)' : 'brands!inner(slug)';
   return `id, ${categorias}, ${marcas}`;
 }
 
@@ -52,10 +61,20 @@ const ORDENES: Record<ProductOrder, Array<[string, boolean]>> = {
     ['created_at', false],
   ],
   recientes: [['created_at', false]],
-  precio_asc: [['precio_bob_cents', true]],
-  precio_desc: [['precio_bob_cents', false]],
+  precio_asc: [['precio_efectivo_cents', true]],
+  precio_desc: [['precio_efectivo_cents', false]],
   nombre: [['nombre', true]],
 };
+
+/**
+ * PostgREST escapa la sintaxis de filtros con comas, comillas y paréntesis, así
+ * que el texto buscado se sanea antes de armarlo: un ")" no debe cerrar el filtro.
+ */
+function busquedaTexto(q: string): string {
+  const limpio = q.replace(/[,()'"\\]/g, ' ').trim();
+  const patron = `%${limpio}%`;
+  return `nombre.ilike.${patron},descripcion.ilike.${patron}`;
+}
 
 function unwrap<T>(data: unknown, error: { message: string } | null, contexto: string): T {
   if (error) throw new Error(`${contexto}: ${error.message}`);
@@ -67,11 +86,12 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
   return {
     async products(f: ProductFilters): Promise<ProductRow[]> {
       let q = client.from('products').select(selectPara(f)).eq('activo', f.activo);
-      if (f.categoria_slug !== undefined) q = q.eq('categories.slug', f.categoria_slug);
-      if (f.marca_slug !== undefined) q = q.eq('brands.slug', f.marca_slug);
-      if (f.color !== undefined) q = q.eq('color', f.color);
-      if (f.precio_min_cents !== undefined) q = q.gte('precio_bob_cents', f.precio_min_cents);
-      if (f.precio_max_cents !== undefined) q = q.lte('precio_bob_cents', f.precio_max_cents);
+      if (f.categoria_slugs !== undefined) q = q.in('categories.slug', f.categoria_slugs);
+      if (f.marca_slugs !== undefined) q = q.in('brands.slug', f.marca_slugs);
+      if (f.colores !== undefined) q = q.in('color', f.colores);
+      if (f.q !== undefined) q = q.or(busquedaTexto(f.q));
+      if (f.precio_min_cents !== undefined) q = q.gte(COLUMNA_PRECIO, f.precio_min_cents);
+      if (f.precio_max_cents !== undefined) q = q.lte(COLUMNA_PRECIO, f.precio_max_cents);
       if (f.en_oferta === true) q = q.not('precio_oferta_bob_cents', 'is', null);
       if (f.en_oferta === false) q = q.is('precio_oferta_bob_cents', null);
       for (const [columna, ascendente] of ORDENES[f.orden]) {
@@ -87,11 +107,12 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
         .from('products')
         .select(countSelectPara(f), { count: 'exact', head: true })
         .eq('activo', f.activo);
-      if (f.categoria_slug !== undefined) q = q.eq('categories.slug', f.categoria_slug);
-      if (f.marca_slug !== undefined) q = q.eq('brands.slug', f.marca_slug);
-      if (f.color !== undefined) q = q.eq('color', f.color);
-      if (f.precio_min_cents !== undefined) q = q.gte('precio_bob_cents', f.precio_min_cents);
-      if (f.precio_max_cents !== undefined) q = q.lte('precio_bob_cents', f.precio_max_cents);
+      if (f.categoria_slugs !== undefined) q = q.in('categories.slug', f.categoria_slugs);
+      if (f.marca_slugs !== undefined) q = q.in('brands.slug', f.marca_slugs);
+      if (f.colores !== undefined) q = q.in('color', f.colores);
+      if (f.q !== undefined) q = q.or(busquedaTexto(f.q));
+      if (f.precio_min_cents !== undefined) q = q.gte(COLUMNA_PRECIO, f.precio_min_cents);
+      if (f.precio_max_cents !== undefined) q = q.lte(COLUMNA_PRECIO, f.precio_max_cents);
       if (f.en_oferta === true) q = q.not('precio_oferta_bob_cents', 'is', null);
       if (f.en_oferta === false) q = q.is('precio_oferta_bob_cents', null);
       const res = await q;
@@ -118,7 +139,13 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
 
     async productsPorIds(ids: string[]): Promise<ProductRow[]> {
       if (ids.length === 0) return [];
-      const res = await client.from('products').select(SELECT_BASE).in('id', ids);
+      // `.eq('activo', true)`: un producto desactivado no se puede pedir aunque
+      // alguien conserve su id.
+      const res = await client
+        .from('products')
+        .select(SELECT_BASE)
+        .in('id', ids)
+        .eq('activo', true);
       return unwrap<ProductRow[]>(res.data, res.error, 'productsPorIds');
     },
 

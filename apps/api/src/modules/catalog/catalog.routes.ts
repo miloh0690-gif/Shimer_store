@@ -9,9 +9,11 @@ import {
 import type { CatalogDataSource, ProductQuery } from './catalog.types.js';
 
 const querySchema = z.object({
+  // CSV y no un valor suelto: el filtro de la tienda permite marcar varios.
   categoria: z.string().min(1).optional(),
   marca: z.string().min(1).optional(),
   color: z.string().min(1).optional(),
+  q: z.string().trim().min(1).optional(),
   precio_min: z.coerce.number().min(0).optional(),
   precio_max: z.coerce.number().min(0).optional(),
   en_oferta: z

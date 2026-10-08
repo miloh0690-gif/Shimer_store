@@ -6,9 +6,10 @@ import {
   supabaseProfilesDataSource,
   supabaseRespaldoToken,
 } from './db.js';
-import { loadEnv } from './env.js';
+import { assertConfigProduccion, loadEnv } from './env.js';
 
 const env = loadEnv();
+assertConfigProduccion(env);
 
 const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },

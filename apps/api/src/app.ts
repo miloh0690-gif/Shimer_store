@@ -2,7 +2,7 @@ import cors from 'cors';
 import express, { type ErrorRequestHandler, type Express } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { errorEnvelope } from './errors.js';
+import { AppError, errorEnvelope } from './errors.js';
 import type { Env } from './env.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
 import { ordersRoutes } from './modules/orders/orders.routes.js';
@@ -26,6 +26,13 @@ export function createApp(deps: AppDeps): Express {
   const app = express();
 
   app.disable('x-powered-by');
+
+  // Render termina TLS en su balanceador y reenvía por HTTP con X-Forwarded-For.
+  // Sin esto `req.ip` es siempre la IP del balanceador, el limitador se vuelve un
+  // cubo único y basta un bot para tumbar la API de toda la tienda. El 1 (y no
+  // `true`) es deliberado: Render AGREGA al encabezado en vez de reemplazarlo, y
+  // con `true` un cliente podría inventar su propia IP y esquivar el límite.
+  app.set('trust proxy', 1);
 
   app.use(
     helmet({
@@ -100,6 +107,12 @@ export function createApp(deps: AppDeps): Express {
 
   const handler: ErrorRequestHandler = (err, _req, res, _next) => {
     const { status, body } = errorEnvelope(err);
+    // Los AppError son respuestas esperadas (400, 404, 409). Cualquier otra
+    // cosa es una caída que hay que ver en los logs de Render, porque el cliente
+    // solo recibe un "Error interno" y sin esto no queda ningún rastro.
+    if (!(err instanceof AppError)) {
+      console.error('[shimer-api] error no controlado', err);
+    }
     res.status(status).json(body);
   };
   app.use(handler);

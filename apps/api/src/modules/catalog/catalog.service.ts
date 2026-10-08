@@ -20,6 +20,18 @@ export function precioEfectivo(p: PrecioLike): number {
   return p.precio_oferta_bob_cents !== null ? p.precio_oferta_bob_cents : p.precio_bob_cents;
 }
 
+/**
+ * La tienda manda los filtros de categorías, marcas y colores como CSV
+ * (`categoria=arte-diseno,escolar`) porque viven en la URL. Acá se parten en
+ * listas; con un solo valor la lista tiene un elemento.
+ */
+export function listaCsv(valor: string): string[] {
+  return valor
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 function buildFilters(q: ProductQuery): ProductFilters {
   const f: ProductFilters = {
     activo: true,
@@ -27,9 +39,10 @@ function buildFilters(q: ProductQuery): ProductFilters {
     desde: (q.pagina - 1) * q.por_pagina,
     limite: q.por_pagina,
   };
-  if (q.categoria !== undefined) f.categoria_slug = q.categoria;
-  if (q.marca !== undefined) f.marca_slug = q.marca;
-  if (q.color !== undefined) f.color = q.color;
+  if (q.categoria !== undefined) f.categoria_slugs = listaCsv(q.categoria);
+  if (q.marca !== undefined) f.marca_slugs = listaCsv(q.marca);
+  if (q.color !== undefined) f.colores = listaCsv(q.color);
+  if (q.q !== undefined) f.q = q.q;
   if (q.precio_min !== undefined) f.precio_min_cents = bobToCents(q.precio_min);
   if (q.precio_max !== undefined) f.precio_max_cents = bobToCents(q.precio_max);
   if (q.en_oferta !== undefined) f.en_oferta = q.en_oferta;
@@ -40,10 +53,17 @@ function variantesPorProducto(rows: ProductVariantRow[]): Map<string, ProductVar
   const map = new Map<string, ProductVariantView[]>();
   for (const v of rows) {
     const lista = map.get(v.product_id) ?? [];
-    lista.push({ id: v.id, nombre: v.nombre, valor: v.valor, stock: v.stock, sku: v.sku });
+    lista.push({
+      id: v.id,
+      nombre: v.nombre,
+      valor: v.valor,
+      stock: v.stock,
+      sku: v.sku,
+      orden: v.orden,
+    });
     map.set(v.product_id, lista);
   }
-  for (const lista of map.values()) lista.sort((a, b) => a.id.localeCompare(b.id));
+  for (const lista of map.values()) lista.sort((a, b) => a.orden - b.orden);
   return map;
 }
 

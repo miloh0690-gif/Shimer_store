@@ -49,6 +49,11 @@ export type ProductVariantView = {
   valor: string
   stock: number
   sku: string | null
+  /**
+   * El orden con el que el dueño curó la lista de colores. Sin este campo la
+   * API los entregaba ordenados por UUID, que es ruido para el cliente.
+   */
+  orden: number
 }
 
 export type ProductView = {
@@ -85,6 +90,8 @@ export type ProductQuery = {
   categoria?: string
   marca?: string
   color?: string
+  /** Búsqueda por texto sobre nombre y descripción. */
+  q?: string
   precio_min?: number
   precio_max?: number
   en_oferta?: boolean
@@ -95,9 +102,11 @@ export type ProductQuery = {
 
 export type ProductFilters = {
   activo: true
-  categoria_slug?: string
-  marca_slug?: string
-  color?: string
+  /** Listas y no valores sueltos: la tienda permite marcar varias categorías. */
+  categoria_slugs?: string[]
+  marca_slugs?: string[]
+  colores?: string[]
+  q?: string
   precio_min_cents?: number
   precio_max_cents?: number
   en_oferta?: boolean

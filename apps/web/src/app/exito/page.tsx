@@ -6,14 +6,16 @@ export const metadata: Metadata = {
   description: 'Recibimos tu pedido de SHIMER.',
 }
 
+// El texto promete solo lo que el sistema hace hoy: no hay pasarela de pago
+// ni envio de correos, asi que la coordinacion es por telefono.
 const proximosPasos = [
-  {
-    titulo: 'Te escribimos al correo',
-    detalle: 'Dentro de las próximas horas te llega la confirmación con el detalle del pedido.',
-  },
   {
     titulo: 'Te llamamos para coordinar',
     detalle: 'Confirmamos por teléfono o WhatsApp la entrega y el pago.',
+  },
+  {
+    titulo: 'Guardamos tu folio',
+    detalle: 'Con ese número encontramos tu pedido cuando nos escribas.',
   },
   {
     titulo: 'Preparamos tu pedido',

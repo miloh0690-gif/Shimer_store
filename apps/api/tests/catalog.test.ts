@@ -213,9 +213,9 @@ describe('listProducts', () => {
     expect(src.calls.products).toBe(1);
     expect(src.calls.countProducts).toBe(1);
     expect(src.lastFilters?.activo).toBe(true);
-    expect(src.lastFilters?.categoria_slug).toBe('arte-diseno');
-    expect(src.lastFilters?.marca_slug).toBe('crayola');
-    expect(src.lastFilters?.color).toBe('Rojo');
+    expect(src.lastFilters?.categoria_slugs).toEqual(['arte-diseno']);
+    expect(src.lastFilters?.marca_slugs).toEqual(['crayola']);
+    expect(src.lastFilters?.colores).toEqual(['Rojo']);
   });
 
   it('traduce en_oferta a un filtro propio', async () => {
@@ -308,7 +308,7 @@ describe('rutas de catálogo', () => {
     expect(res.body.items[0].precio_efectivo_bob_cents).toBe(54900);
     expect(catalog.lastFilters).toMatchObject({
       activo: true,
-      categoria_slug: 'arte-diseno',
+      categoria_slugs: ['arte-diseno'],
       precio_min_cents: 10000,
       precio_max_cents: 100000,
       en_oferta: true,

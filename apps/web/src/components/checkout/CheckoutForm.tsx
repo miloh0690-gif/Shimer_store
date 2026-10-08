@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { z } from 'zod'
@@ -9,6 +9,7 @@ import { apiUrl } from '@/lib/api'
 import type { ApiErrorBody, CreateOrderResponse } from '@/lib/types'
 import { useCarrito } from '@/components/carrito/CartProvider'
 import { formatBob } from '@/lib/format'
+import { borrarIdempotencia, leerIdempotencia } from '@/lib/idempotencia'
 
 type Errores = Partial<Record<keyof CheckoutDatos, string>>
 
@@ -25,9 +26,19 @@ export function CheckoutForm() {
   const router = useRouter()
   const { state, dispatch, subtotal, listo } = useCarrito()
 
-  // La key se crea una sola vez por montaje: cada reintento del mismo envio
-  // manda la misma, y la API responde la orden ya creada en vez de duplicarla.
-  const [idempotencyKey] = useState(() => crypto.randomUUID())
+  // La key vive en sessionStorage, no en el estado del componente: si el POST
+  // llega a la API pero la respuesta se pierde y el cliente vuelve a /checkout,
+  // tiene que mandar la misma key para que la API responda la orden ya creada
+  // en vez de duplicar el pedido. Se borra recien con la confirmacion.
+  //
+  // Se lee en un efecto y no en el inicializador del useState porque esta pagina
+  // se prerenderiza en el servidor, donde `window` no existe. El inicializador
+  // corre en el servidor y volveria una key distinta a la del cliente.
+  const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    setIdempotencyKey(leerIdempotencia(window.sessionStorage))
+  }, [])
 
   const [datos, setDatos] = useState<CheckoutDatos>({
     cliente_nombre: '',
@@ -62,12 +73,16 @@ export function CheckoutForm() {
     setEnviando(true)
     setErrorEnvio(null)
 
+    // Si el efecto todavia no corrio (o el storage fallo), se lee ahora: el
+    // importante es que todas las lineas siguientes usen la misma.
+    const key = idempotencyKey ?? leerIdempotencia(window.sessionStorage)
+
     try {
       const respuesta = await fetch(apiUrl('/api/orders'), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'idempotency-key': idempotencyKey,
+          'idempotency-key': key,
         },
         body: JSON.stringify({
           cliente_nombre: parsed.data.cliente_nombre,
@@ -101,6 +116,10 @@ export function CheckoutForm() {
       }
 
       const creado = (await respuesta.json()) as CreateOrderResponse
+      // El pedido quedo registrado: la key ya cumplio su funcion y la proxima
+      // compra tiene que poder crear su propia orden.
+      borrarIdempotencia(window.sessionStorage)
+      setIdempotencyKey(null)
       dispatch({ type: 'vaciar' })
       router.push('/exito?folio=' + encodeURIComponent(creado.folio))
     } catch {

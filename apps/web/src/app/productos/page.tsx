@@ -94,10 +94,8 @@ export default async function PaginaProductos({
           ) : (
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
               {items.map((producto, i) => (
-                <Reveal key={producto.id} delay={(i % 4) * 0.06}>
-                  <li className="h-full">
-                    <ProductCard product={producto} />
-                  </li>
+                <Reveal as="li" key={producto.id} delay={(i % 4) * 0.06} className="h-full">
+                  <ProductCard product={producto} />
                 </Reveal>
               ))}
             </ul>

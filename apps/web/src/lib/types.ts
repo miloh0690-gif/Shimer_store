@@ -52,6 +52,16 @@ export type BrandView = {
   logo_url: string | null;
 };
 
+export type ProductOrden = 'destacado' | 'recientes' | 'precio_asc' | 'precio_desc' | 'nombre'
+
+export const PRODUCT_ORDENES: ProductOrden[] = [
+  'destacado',
+  'recientes',
+  'precio_asc',
+  'precio_desc',
+  'nombre',
+]
+
 export type ProductListResponse = {
   items: ProductView[];
   total: number;

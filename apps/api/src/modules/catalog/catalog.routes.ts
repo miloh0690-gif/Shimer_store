@@ -5,8 +5,6 @@ import {
   POR_PAGINA_POR_DEFECTO,
   getProductBySlug,
   listProducts,
-  toBrandRef,
-  toCategoryRef,
 } from './catalog.service.js';
 import type { CatalogDataSource, ProductQuery } from './catalog.types.js';
 
@@ -31,14 +29,15 @@ export function catalogRoutes(deps: { catalog: CatalogDataSource }): Router {
   const { catalog } = deps;
   const router = Router();
 
+  // Las filas completas, no solo el par {slug, nombre}: el frontend usa el id
+  // como clave de React y la descripción y el orden en los tiles de categoría.
   router.get('/categories', async (_req, res) => {
     const rows = await catalog.categories();
-    res.json([...rows].sort((a, b) => a.orden - b.orden).map(toCategoryRef));
+    res.json([...rows].sort((a, b) => a.orden - b.orden));
   });
 
   router.get('/brands', async (_req, res) => {
-    const rows = await catalog.brands();
-    res.json(rows.map(toBrandRef));
+    res.json(await catalog.brands());
   });
 
   router.get('/products', async (req, res) => {

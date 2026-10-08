@@ -247,6 +247,31 @@ describe('getProductBySlug', () => {
   });
 });
 
+  it('GET /categories devuelve la vista completa con id, descripcion y orden', async () => {
+    const res = await request(createApp({ env, catalog: fakeCatalog() })).get('/api/categories');
+    expect(res.status).toBe(200);
+    const cats = res.body as Array<Record<string, unknown>>;
+    expect(cats[0]).toMatchObject({
+      id: expect.any(String),
+      slug: expect.any(String),
+      nombre: expect.any(String),
+      orden: expect.any(Number),
+    });
+    expect(cats[0]).toHaveProperty('descripcion');
+  });
+
+  it('GET /brands devuelve la vista completa con id y logo_url', async () => {
+    const res = await request(createApp({ env, catalog: fakeCatalog() })).get('/api/brands');
+    expect(res.status).toBe(200);
+    const marcas = res.body as Array<Record<string, unknown>>;
+    expect(marcas[0]).toMatchObject({
+      id: expect.any(String),
+      slug: expect.any(String),
+      nombre: expect.any(String),
+    });
+    expect(marcas[0]).toHaveProperty('logo_url');
+  });
+
 describe('rutas de catálogo', () => {
   let catalog: FakeCatalog;
 
@@ -258,17 +283,17 @@ describe('rutas de catálogo', () => {
     const app = createApp({ env, catalog });
     const res = await request(app).get('/api/categories');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([
+    expect(res.body).toMatchObject([
       { slug: 'arte-diseno', nombre: 'Arte & Diseño' },
       { slug: 'escolar', nombre: 'Escolar' },
     ]);
   });
 
-  it('GET /api/brands devuelve slug y nombre de cada marca', async () => {
+  it('GET /api/brands devuelve cada marca', async () => {
     const app = createApp({ env, catalog });
     const res = await request(app).get('/api/brands');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([{ slug: 'crayola', nombre: 'Crayola' }]);
+    expect(res.body).toMatchObject([{ slug: 'crayola', nombre: 'Crayola' }]);
   });
 
   it('GET /api/products devuelve la página pedida y traduce los filtros a cents', async () => {

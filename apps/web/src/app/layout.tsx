@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { Fredoka, Plus_Jakarta_Sans } from 'next/font/google'
+import { Footer } from '@/components/layout/Footer'
+import { Header } from '@/components/layout/Header'
 import { MotionRoot } from '@/components/motion/MotionRoot'
 import './globals.css'
 
@@ -27,7 +29,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-BO" className={`${fredoka.variable} ${jakarta.variable}`}>
       <body>
-        <MotionRoot>{children}</MotionRoot>
+        <MotionRoot>
+          <Header />
+          {children}
+          <Footer />
+        </MotionRoot>
       </body>
     </html>
   )

@@ -7,9 +7,16 @@ import type { Env } from './env.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
 import { ordersRoutes } from './modules/orders/orders.routes.js';
 import type { OrdersDataSource } from './modules/orders/orders.types.js';
+import { adminRoutes, ordersMineRoutes } from './modules/admin/admin.routes.js';
+import type { ProfilesDataSource } from './auth.js';
 import type { CatalogDataSource } from './modules/catalog/catalog.types.js';
 
-export type AppDeps = { env: Env; catalog?: CatalogDataSource; orders?: OrdersDataSource };
+export type AppDeps = {
+  env: Env;
+  catalog?: CatalogDataSource;
+  orders?: OrdersDataSource;
+  profiles?: ProfilesDataSource;
+};
 
 export const API_VERSION = '0.1.0';
 
@@ -70,6 +77,20 @@ export function createApp(deps: AppDeps): Express {
   }
   if (deps.catalog && deps.orders) {
     app.use('/api', ordersRoutes({ env: deps.env, catalog: deps.catalog, orders: deps.orders }));
+  }
+  if (deps.orders) {
+    app.use('/api', ordersMineRoutes({ env: deps.env, orders: deps.orders }));
+  }
+  if (deps.catalog && deps.orders && deps.profiles) {
+    app.use(
+      '/api',
+      adminRoutes({
+        env: deps.env,
+        catalog: deps.catalog,
+        orders: deps.orders,
+        profiles: deps.profiles,
+      }),
+    );
   }
 
   const handler: ErrorRequestHandler = (err, _req, res, _next) => {

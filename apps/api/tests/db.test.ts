@@ -1,6 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
-import { supabaseCatalogDataSource, supabaseOrdersDataSource } from '../src/db.js';
+import {
+  supabaseCatalogDataSource,
+  supabaseOrdersDataSource,
+  supabaseProfilesDataSource,
+} from '../src/db.js';
 import type { ProductFilters } from '../src/modules/catalog/catalog.types.js';
 
 type Llamada = { nombre: string; args: unknown[] };
@@ -13,6 +17,9 @@ function clienteFalso() {
   const chain: Record<string, unknown> = {};
   const metodos = [
     'select',
+    'insert',
+    'update',
+    'delete',
     'eq',
     'neq',
     'gte',
@@ -419,5 +426,46 @@ describe('supabaseOrdersDataSource', () => {
     await expect(
       supabaseOrdersDataSource(vacio.client).updateEstado('o9', 'enviado'),
     ).rejects.toThrow('no existe');
+  });
+});
+
+describe('supabaseCatalogDataSource.updateProduct', () => {
+  it('actualiza el producto y devuelve la fila', async () => {
+    const { client, calls } = clienteFalso();
+    await supabaseCatalogDataSource(client).updateProduct('p1', { stock: 7 });
+    const upd = calls.find((c) => c.nombre === 'update');
+    expect(upd?.args[0]).toMatchObject({ stock: 7 });
+    expect(calls.some((c) => c.nombre === 'eq' && c.args[0] === 'id')).toBe(true);
+  });
+});
+
+describe('supabaseProfilesDataSource', () => {
+  it('findById lee id, email, nombre y rol', async () => {
+    const { client, selects, calls } = clienteFalso();
+    await supabaseProfilesDataSource(client).findById('u1');
+    expect(selects[0]).toBe('id,email,nombre,rol');
+    expect(calls.some((c) => c.nombre === 'maybeSingle')).toBe(true);
+  });
+
+  it('findById devuelve null si no hay perfil', async () => {
+    const { client } = clienteFalso();
+    await expect(supabaseProfilesDataSource(client).findById('u9')).resolves.toBeNull();
+  });
+
+  it('ensureAdmin crea el perfil como admin cuando no existe', async () => {
+    const { client, calls } = clientePedidos({
+      profiles: [{ data: null, error: null }],
+    });
+    await supabaseProfilesDataSource(client).ensureAdmin('u1', 'dueno@ejemplo.com', null);
+    const ins = calls.find((c) => c.nombre === 'profiles.insert');
+    expect(ins?.args[0]).toMatchObject({ id: 'u1', rol: 'admin' });
+  });
+
+  it('ensureAdmin no toca un perfil que ya existe', async () => {
+    const { client, calls } = clientePedidos({
+      profiles: [{ data: { id: 'u1', rol: 'cliente' }, error: null }],
+    });
+    await supabaseProfilesDataSource(client).ensureAdmin('u1', 'dueno@ejemplo.com', null);
+    expect(calls.some((c) => c.nombre === 'profiles.insert')).toBe(false);
   });
 });

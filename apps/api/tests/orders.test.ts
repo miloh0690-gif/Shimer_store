@@ -80,6 +80,7 @@ function fakeCatalog(o: Partial<CatalogDataSource> = {}): CatalogDataSource {
     variantsFor: async () => [],
     categories: async () => CATEGORIAS,
     brands: async () => MARCAS,
+    updateProduct: async () => null,
     productsPorIds: async (ids) => [producto()].filter((p) => ids.includes(p.id)),
   }
   return { ...base, ...o }
@@ -142,6 +143,7 @@ function fakeOrders(
       return orden
     },
     listOrdersByEmail: async () => [...porId.values()],
+    listAll: async () => [...porId.values()],
     updateEstado: async (id, estado) => {
       const orden = [...porId.values()][0]
       if (!orden) throw new Error('no existe')

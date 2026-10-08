@@ -97,6 +97,9 @@ function fakeCatalog(overrides: Partial<CatalogDataSource> = {}): FakeCatalog {
     async productBySlug(slug) {
       return slug === 'crayola-super-tips-150' ? fila() : null;
     },
+    async updateProduct() {
+      return null;
+    },
     async productsPorIds(ids) {
       return ids.includes('p1') ? [fila()] : [];
     },

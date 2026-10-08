@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { createApp } from './app.js';
-import { supabaseCatalogDataSource, supabaseOrdersDataSource } from './db.js';
+import {
+  supabaseCatalogDataSource,
+  supabaseOrdersDataSource,
+  supabaseProfilesDataSource,
+} from './db.js';
 import { loadEnv } from './env.js';
 
 const env = loadEnv();
@@ -13,6 +17,7 @@ const app = createApp({
   env,
   catalog: supabaseCatalogDataSource(client),
   orders: supabaseOrdersDataSource(client),
+  profiles: supabaseProfilesDataSource(client),
 });
 
 app.listen(env.PORT, () => {

@@ -15,6 +15,8 @@ import type {
   OrderWithItems,
   OrdersDataSource,
 } from './modules/orders/orders.types.js';
+import type { PatchProducto } from './modules/admin/admin.schemas.js';
+import type { Perfil, ProfilesDataSource } from './auth.js';
 
 const SELECT_CATEGORIA = 'categories(slug,nombre)';
 const SELECT_MARCA = 'brands(slug,nombre)';
@@ -99,6 +101,17 @@ export function supabaseCatalogDataSource(client: SupabaseClient): CatalogDataSo
     async productBySlug(slug: string): Promise<ProductRow | null> {
       const res = await client.from('products').select(SELECT_BASE).eq('slug', slug).maybeSingle();
       if (res.error) throw new Error(`productBySlug: ${res.error.message}`);
+      return res.data as ProductRow | null;
+    },
+
+    async updateProduct(id: string, parches: PatchProducto): Promise<ProductRow | null> {
+      const res = await client
+        .from('products')
+        .update({ ...parches, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (res.error) throw new Error(`updateProduct: ${res.error.message}`);
       return res.data as ProductRow | null;
     },
 
@@ -239,6 +252,17 @@ export function supabaseOrdersDataSource(client: SupabaseClient): OrdersDataSour
       return filas.map((f, i) => toOrderWithItems(f, items[i] ?? []));
     },
 
+    async listAll(): Promise<OrderWithItems[]> {
+      const res = await client
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      const filas = unwrap<OrderRow[]>(res.data, res.error, 'listAll');
+      const items = await Promise.all(filas.map((f) => itemsDe(f.id)));
+      return filas.map((f, i) => toOrderWithItems(f, items[i] ?? []));
+    },
+
     async updateEstado(id: string, estado: string): Promise<OrderWithItems> {
       const res = await client
         .from('orders')
@@ -249,6 +273,37 @@ export function supabaseOrdersDataSource(client: SupabaseClient): OrdersDataSour
       if (res.error) throw new Error(`updateEstado: ${res.error.message}`);
       if (!res.data) throw new Error(`updateEstado: la orden ${id} no existe`);
       return conItems(res.data as OrderRow);
+    },
+  };
+}
+
+
+export function supabaseProfilesDataSource(client: SupabaseClient): ProfilesDataSource {
+  return {
+    async findById(id: string): Promise<Perfil | null> {
+      const res = await client
+        .from('profiles')
+        .select('id,email,nombre,rol')
+        .eq('id', id)
+        .maybeSingle();
+      if (res.error) throw new Error(`findById: ${res.error.message}`);
+      return res.data as Perfil | null;
+    },
+
+    /**
+     * Crea el perfil como admin solo si no existe. Si ya existe se deja como
+     * está: promover por email no debe degradar a nadie ni quitarle el rol.
+     */
+    async ensureAdmin(id: string, email: string, nombre: string | null): Promise<void> {
+      const existente = await client
+        .from('profiles')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+      if (existente.error) throw new Error(`ensureAdmin: ${existente.error.message}`);
+      if (existente.data) return;
+      const ins = await client.from('profiles').insert({ id, email, nombre, rol: 'admin' });
+      if (ins.error) throw new Error(`ensureAdmin: ${ins.error.message}`);
     },
   };
 }

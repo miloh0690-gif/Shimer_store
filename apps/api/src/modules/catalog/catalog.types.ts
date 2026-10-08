@@ -106,10 +106,19 @@ export type ProductFilters = {
   limite: number
 }
 
+import type { PatchProducto } from '../admin/admin.schemas.js';
+
 export type CatalogDataSource = {
   products(f: ProductFilters): Promise<ProductRow[]>
   countProducts(f: ProductFilters): Promise<number>
   productBySlug(slug: string): Promise<ProductRow | null>
+  /**
+   * Trae varios productos por id en una sola consulta. Lo usa el módulo de
+   * pedidos para resolver todas las líneas de un carrito de una vez.
+   */
+  productsPorIds(ids: string[]): Promise<ProductRow[]>
+  /** Aplica un parche administrativo a un producto. Devuelve null si no existe. */
+  updateProduct(id: string, parches: PatchProducto): Promise<ProductRow | null>
   variantsFor(ids: string[]): Promise<ProductVariantRow[]>
   categories(): Promise<CategoryRow[]>
   brands(): Promise<BrandRow[]>

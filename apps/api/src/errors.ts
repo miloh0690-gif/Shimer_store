@@ -20,6 +20,10 @@ export function validacion(message: string, details: unknown[] = []): AppError {
   return new AppError('VALIDATION', 400, message, details);
 }
 
+export function unauthorized(message = 'Necesitás iniciar sesión'): AppError {
+  return new AppError('UNAUTHORIZED', 401, message);
+}
+
 export function notFound(message = 'Recurso no encontrado'): AppError {
   return new AppError('NOT_FOUND', 404, message);
 }

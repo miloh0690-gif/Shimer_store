@@ -99,6 +99,8 @@ export type OrdersDataSource = {
   nextFolio(): Promise<string>
   createOrder(input: CreateOrderRecord): Promise<OrderWithItems>
   listOrdersByEmail(email: string): Promise<OrderWithItems[]>
+  /** Todas las órdenes, para el panel de administración. */
+  listAll(): Promise<OrderWithItems[]>
   updateEstado(id: string, estado: string): Promise<OrderWithItems>
 }
 
